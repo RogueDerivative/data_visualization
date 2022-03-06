@@ -1,0 +1,126 @@
+---
+title: "Peer_Review_Project"
+author: "Nate Foulkes"
+date: "3/5/2022"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+```{r get_data, include=FALSE}
+source("calories.r")
+source("sales.r")
+```
+
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(visdat)
+library(skimr)
+library(ggrepel)
+```
+# Problem 1 
+
+
+```{r prob_1, include=FALSE}
+sales <- sales %>%
+    mutate(prop_fran = num_franchised_stores/unit_count)
+```
+```{r plot_1}
+sales %>%
+    ggplot(aes(x=us_sales,y=unit_count))+
+    geom_point(aes(color=prop_fran))+
+    scale_y_continuous(trans = "log10") +
+    scale_x_continuous(trans = "log10") +
+    labs(x="U.S. sales in millions (log10 scale)",
+         y="Total number of stores (log10 scale)",)+
+    scale_color_continuous(name="Proportion of stores \n franchised")+
+    geom_text_repel(aes(label=restaurant))+
+    theme_bw()
+``` 
+
+
+# Problem 2 
+
+
+```{r problem_2,include=FALSE}
+sales$dollars <- paste0("$",sales$average_sales)
+```
+```{r plot_2}
+sales %>% 
+    ggplot(aes(x=fct_reorder(restaurant,average_sales),
+               y=average_sales))+
+    geom_bar(stat="identity")+
+    scale_y_continuous(labels = scales::label_dollar(),limits=c(0,3000))+
+    coord_flip()+
+    theme_classic()+
+    labs(x="Average sales per unit store (in thousands)",
+         y="restaurants")+
+    geom_text(aes(label=dollars),hjust=-0.1)
+``` 
+
+# Problem 3 
+
+
+```{r problem_3,include=FALSE}
+calories <- calories %>% mutate(high_sodium=sodium>2300) 
+``` 
+```{r plot_3}
+calories %>%
+    ggplot(aes(x=calories,y=sodium,label=item)) +
+    geom_point()+
+    facet_wrap(~restaurant)+
+    geom_hline(yintercept = 2300,size=0.5)+
+    geom_text_repel(data = filter(calories, high_sodium == TRUE),
+                    size=2,
+                    max.overlaps = Inf,
+                    nudge_x=250,
+                    nudge_y = 250) +
+    theme_bw() +
+    theme(legend.position = "none")
+``` 
+
+# Problem 4 
+
+
+```{r problem_4,include=FALSE}
+calories <- calories %>%
+    mutate(is_salad = str_detect(string=item, pattern="[sS]alad"))
+```
+```{r plot_4}
+calories %>% 
+    ggplot(aes(x=calories,y=fct_reorder(restaurant,calories,.fun=median)))+
+    geom_boxplot(outlier.shape = NA)+
+    geom_point(position = "jitter",aes(color=is_salad))+
+    scale_x_continuous(trans = "log10")+
+    theme_bw()+
+    ylab("Restaurant")+
+    xlab("Calories (log10 scale)")+
+    scale_color_manual(values= c("red","darkgreen"),
+                       name="Is the entree \n a salad?",
+                       labels=c("Not a Salad","Salad"))
+``` 
+
+# Problem 5 
+
+```{r problem_5,include=FALSE}
+x <- calories %>% filter(restaurant != "Taco Bell") %>%
+    group_by(restaurant)%>%
+    summarise(median_sugar=median(sugar))
+z <- inner_join(x,sales)
+```
+```{r plot_5}
+z %>% ggplot(aes(x=fct_reorder(restaurant,us_sales),
+                 y=us_sales,fill=median_sugar))+
+    geom_bar(stat="identity")+
+    labs(y="U.S. sales (in Millions)",
+         x="Restaurant",
+         fill = "Median sugar (grams)\n in fast food entrees")
+```
+
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+
+```
