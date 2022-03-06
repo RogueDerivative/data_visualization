@@ -1,0 +1,221 @@
+---
+title: "Data Visualization"
+author: "Nate Foulkes"
+date: "3/3/2022"
+output: html_document
+---
+# Assignment Description 
+The goal of this peer-reviewed project was to apply the principles of "tidy data" on two provided data sets, to then perform exploratory data analysis on the data, and then present a final visual representation of some type of analysis. 
+
+### Tidy Data 
+The provided data is generally clean. The feature names are representative of the observation within, words are separated by an underscore. Within the `sales` data there is an unusual character preceding the "restaurant" label which had to be replaced in order to join the two tables. In the `calories` data there appears to be one unusual value: the *Sonic Ultimate Chicken Club* has **100** total calories and **580** calories from fat, which is nonsensical. It is the 100 total calories that appears to be the issue since most other chicken based items tend to have a significant proportion of calories from fat. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+```{r libraries,include=FALSE}
+## libraries
+library(tidyverse)
+library(visdat)
+library(skimr)
+library(cowplot)
+library(kableExtra)
+library(ggrepel)
+```
+
+
+
+```{r datasets,include=FALSE}
+source("sales.r")
+source("calories.r")
+```
+
+```{r my_skim, include=FALSE}
+my_skim <- skim_with(
+    numeric = sfl(
+        mean = mean,
+        median = median,
+        std_dev = sd
+    ),
+    append = FALSE
+)
+``` 
+
+### Exploratory Data Analysis 
+Once the files have been sourced there needs to be a quick review of what is included in the csv files. The `calories` file consists of 515 observations with 16 variables; the features are those that would be typically included on a nutritional information label (e.g. macro nutrients). In Figure 1 we see that the vitamin A, vitamin C, and calcium columns are missing a lot of values (over 50% in fact). The `sales` data is 19 observations with 6 variables and does not have any missing values. Features include average sales per unit (in $1000s), number of company owned stores, number of franchised stores, and total number of stores. 
+
+```{r miss_val, fig.cap="Figure 1: missing values in the calories data."}
+vis_miss(calories)
+``` 
+
+In Table 1 is the summary statistics for the `sales` data. We see that the mean and median for average sales per unit are relatively close together, well within a single deviation. For the unit count data there is a larger difference between the mean and median, also, the standard deviation is larger than the median. The number of stores is skewed right by the Subway restaurant. This doesn't seem to be a surprise since it's difficult to not find a Subway; plus they are usually smaller store fronts in comparison to the other fastfood establishments analyzed here. 
+
+```{r skim_sales}
+kable(my_skim(sales,avg_sales,unit_count),
+      "simple",
+      align = "ccccccc",
+      caption = "Table 1: summary statistics for the Sales data.")%>%
+    kable_styling("striped", "bordered")
+
+``` 
+
+From the `calories` data set: Table 2 gives the summary statistics for total calories, total fat, sodium, and sugar of the combined menu items. For each of these features we notice that the mean is greater than the median. The data suggests that there is some right skew to these features and possible outliers exist. 
+
+
+```{r skim_cal}
+kable(my_skim(calories,calories,total_fat,sodium,sugar),
+      "simple",
+      align = "ccccccc",
+      caption = "Table 2: Summary statistics for some of the features in Calories.")%>%
+    kable_styling("striped", "bordered")
+``` 
+
+Below, in Figure 2, the box plots of the previously summarised features in Table 2 grouped by restaurant The box plots provide visual evidence that agree with the suggestion in Table 2 that outliers are present within the data. 
+
+
+```{r eda_calorie}
+eda_1 <- calories %>%     
+    ggplot(aes(x=restaurant,y=calories,fill=restaurant))+
+    geom_boxplot()+
+    labs(title = "Calories",y = NULL,x = NULL)+
+    theme_cowplot(12) +
+    theme(legend.position = c(0.8, 0.8))
+
+eda_2 <- calories %>% 
+    ggplot(aes(x=restaurant,y=total_fat,fill=restaurant))+
+    labs(title = "Total Fat (in g)",y = NULL,x = NULL)+
+    geom_boxplot()+
+    theme_cowplot(12) +
+    theme(legend.position = "none")
+
+eda_3 <- calories %>% 
+    ggplot(aes(x=restaurant,y=sodium,fill=restaurant))+
+    labs(title = "Sodium (in mg)",y = NULL,x = NULL)+
+    geom_boxplot()+
+    theme_cowplot(12) +
+    theme(legend.position = "none")
+
+eda_4 <- calories %>% ggplot(aes(x=restaurant,y=sugar,fill=restaurant))+
+    geom_boxplot()+
+    theme_cowplot(12) +
+    labs(title = "Sugar (in g)",y = NULL,x = NULL)+
+    theme(legend.position = "none")
+``` 
+```{r eda_plot,fig.align='center',fig.height=8,fig.width=16, fig.show='hold',fig.cap="Figure 2: Box plots of number of calories, total fat, sodium, and sugar content broken down by restaurant."}
+plot_grid(eda_1,eda_2,eda_3,eda_4,ncol=2)
+``` 
+
+### Data Analysis 
+
+Once the data has been cleaned and exploratory analysis has been completed we take the opportunity to see what the data can tell us. Figure 3 displays the correlation between the sodium in a menu item compared to the total fat of that item. To make the scatter plot more distributed the Mcdonalds 20 piece Buttermilk Crispy Chicken Tenders was removed. At 6080 mg of sodium it is 2.6 times higher than the Recommended Dietary Allowance for most American adults for daily sodium intake. Removing it from the plot allowed for a clearer picture for the majority of items at the low end for fat and sodium. 
+
+
+```{r fat_sod_scat,fig.width=10,fig.height=7,fig.cap="Figure 3: The relationship between total fat and sodium in the listed menu items."}
+calories %>% filter(item != "20 piece Buttermilk Crispy Chicken Tenders")%>%
+            ggplot() +
+            geom_point(aes(x = total_fat, y = sodium, color = restaurant)) +
+            labs(title = "Sodium v Total Fat",
+                 subtitle = "Menu Items by Restaurant",
+                 y = "Sodium (in mg)",
+                 x = "Total Fat (in g)") +
+            theme_classic() +
+            theme(title = element_text(size = 16), 
+                  axis.text = element_text(size = 14),
+                  axis.title = element_text(size = 16, face = "bold"),
+                  legend.text = element_text(size = 14),
+                  plot.subtitle = element_text(color = "gray30"))
+``` 
+
+Looking at the amount of sodium versus calories of each menu item in Figure 4. The horizontal red line represents the maximum of 2300 mg of sodium recommended for a majority of adult Americans. The vertical line represents a caloric intake of 667 (2000/3). With the assumption of 2000 calories per day, 667 calories is what is needed to achieve 2000 calories with 3 meals. The named menu items are those with more than 1500 calories. 
+
+```{r high_sodium_scat,fig.width=10,fig.height=7,fig.cap="Figure 4: The amount of sodium in each item in relation to the caloric content."}
+calories %>%
+    ggplot(aes(x = calories, y = sodium, label = item)) +
+    geom_point(aes(color=high_cal)) +
+    scale_color_manual(values = c("grey50", "dodgerblue")) +
+    labs(title = "Sodium v Calories",
+         subtitle = "Highest Calorie Items are Stated",
+         x = "Calories",
+         y = "Sodium (in mg)") +
+    geom_text_repel(data = filter(calories, high_cal == TRUE),
+                    nudge_y = 0, 
+                    hjust = 0,
+                    direction = "y") +
+    theme_classic() +
+    theme(title = element_text(size = 16), 
+          axis.text = element_text(size = 14),
+          axis.title = element_text(size = 16, face = "bold"),
+          legend.position = "none")+
+    geom_hline(yintercept = 2300, color="red",size=0.5)+
+    geom_vline(xintercept = 667, color="red",size=0.5)
+``` 
+
+To accomplish the last set of plots the data from the `calorie` data set was grouped by restaurant and then the calories, total fat, sodium, and sugar were averaged. This collapsed data was inner joined to the `sales` data by restaurant. 
+For each of the four plots in figure 5 the vertical axis is the average sales for each unit of that restaurant. The horizontal axis represent the averages of all the menu items, for some of the features, within each restaurant. 
+
+```{r joined_plot, include=FALSE}
+x <- calories %>% group_by(restaurant) %>%
+    summarise(avg_cal = mean(calories), avg_fat = mean(total_fat), avg_sodium=mean(sodium),avg_sugar=mean(sugar))
+
+z <- inner_join(x,sales)
+
+p1 <- z %>% ggplot(aes(y=avg_sales,x=avg_cal,color=restaurant)) +
+    geom_point(size = 3)  +
+    geom_text(aes(label=restaurant),nudge_y=200)+
+    labs(title = "Sales v Calories",
+         y = "Average Sales per Unit (in $1000s)",
+         x = "Average Calorie per Item") +
+    theme_classic() +
+    theme(title = element_text(size = 16, face = "bold"), 
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 8),
+          legend.position = "none")
+p2 <- z %>% ggplot(aes(y=avg_sales,x=avg_fat,color=restaurant)) +
+    geom_point(size=3)+
+    geom_text(aes(label=restaurant),nudge_y=200)+
+    labs(title = "Sales v Fat",
+         y = NULL,
+         x = "Average Fat per Item") +
+    theme_classic() +
+    theme(title = element_text(size = 16, face = "bold"), 
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 8),
+          legend.position = "none")
+p3 <- z %>% ggplot(aes(y=avg_sales,x=avg_sodium,color=restaurant)) +
+    geom_point(size=3)+
+    geom_text(aes(label=restaurant),nudge_y=200)+
+    labs(title = "Sales v Sodium",
+         y = "Average Sales per Unit (in $1000s)",
+         x = "Average Sodium per Item") +
+    theme_classic() +
+    theme(title = element_text(size = 16, face = "bold"), 
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 8),
+          legend.position = "none")
+p4 <- z %>% ggplot(aes(y=avg_sales,x=avg_sugar,color=restaurant)) +
+    geom_point(size=3)+
+    geom_text(aes(label=restaurant),nudge_y=200)+
+    labs(title = "Sales v Sugar",
+         y = NULL,
+         x = "Average Sugar per Item") +
+    theme_classic() +
+    theme(title = element_text(size = 16, face = "bold"), 
+          axis.text = element_text(size = 8),
+          axis.title = element_text(size = 8),
+          legend.position = "none")
+``` 
+
+```{r joint_plot,fig.width=10,fig.height=7,fig.cap="Figure 5: The average sales for all locations compared to the average calorie, fat (in g), sodium (in mg), and sugar (in g) of all menu items by restaurant."}
+plot_grid(p1,p2,p3,p4,ncol=2)
+```
+
+### Final Word 
+
+To illustrate the point of the saying "how to lie with numbers" the final graphs are not accurate representations. The goal of this exercise was to present a series of exploratory graphs that described the data and then present a series of "presentation ready" graphs. 
+
+# Appendix: r code   
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+
+```
